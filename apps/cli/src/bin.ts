@@ -27,10 +27,19 @@ function readVersion(): string {
 const invocation = parseDshArgs(process.argv.slice(2), readVersion())
 
 switch (invocation.mode) {
+  case 'interactive': {
+    const { runInteractive } = await import('./interactive.ts')
+    await runInteractive({
+      environment: loadLayeredEnv('vincien'),
+      patchFiles: invocation.patches,
+      args: invocation.args,
+    })
+    break
+  }
   case 'profile': {
     const { runProfile } = await import('./profile-boot.ts')
     await runProfile({
-      environment: loadLayeredEnv('dsh'),
+      environment: loadLayeredEnv('vincien'),
       profile: invocation.profile,
       patchFiles: invocation.patches,
       args: invocation.args,
@@ -49,5 +58,5 @@ switch (invocation.mode) {
   }
   default:
     invocation satisfies never
-    throw new Error(`dsh: unhandled invocation mode ${JSON.stringify(invocation)}`)
+    throw new Error(`vincien: unhandled invocation mode ${JSON.stringify(invocation)}`)
 }

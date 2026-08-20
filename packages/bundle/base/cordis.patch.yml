@@ -59,12 +59,12 @@
       name: '@deepseek-ai/dsh-agent'
 
     # The transport-independent default for Agents created by entry points.
-    # Settings may supply a saved selection; consumers read it at creation time.
+    # Dynamically resolved from plugged-in provider/model or environment.
     - id: agent-default-model
       name: '@deepseek-ai/dsh-agent-default-model'
       config:
-        provider: deepseek-official
-        model: deepseek-v4-flash
+        provider: !!js "process.env.LLM_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : (process.env.ANTHROPIC_API_KEY ? 'anthropic' : (process.env.DEEPSEEK_API_KEY ? 'deepseek' : (process.env.CUSTOM_API_KEY || process.env.CUSTOM_BASE_URL ? 'custom' : ''))))"
+        model: !!js "process.env.LLM_MODEL || (process.env.OPENAI_API_KEY ? 'gpt-4o' : (process.env.ANTHROPIC_API_KEY ? 'claude-3-7-sonnet' : (process.env.DEEPSEEK_API_KEY ? 'deepseek-chat' : (process.env.CUSTOM_API_KEY || process.env.CUSTOM_BASE_URL ? 'default' : ''))))"
 
     - id: jobs
       name: '@deepseek-ai/dsh-jobs-local'
@@ -85,15 +85,29 @@
     - id: credentials
       name: '@deepseek-ai/dsh-credentials-local'
 
-    # The pi-ai multi-provider twin, mounted dormant: zero routes (and no extra
-    # models in the picker) until a `llm-pi-ai:` settings section supplies provider
-    # profiles — then those routes register live, keys resolving per request
-    # through their apiKeyEnv references, and drop again when the section empties.
-    # Supplying those profiles is exactly what the web Models page does. Which
-    # adapters exist is composition; which providers run is the user's settings
-    # document.
+    # The multi-provider LLM adapter supporting OpenAI, Anthropic, DeepSeek, and custom APIs.
     - id: llm-pi-ai
       name: '@deepseek-ai/dsh-llm-pi-ai'
+      config:
+        providers:
+          openai:
+            apiKeyEnv: OPENAI_API_KEY
+            baseURL: !!js "process.env.OPENAI_BASE_URL"
+          anthropic:
+            apiKeyEnv: ANTHROPIC_API_KEY
+            baseURL: !!js "process.env.ANTHROPIC_BASE_URL"
+          deepseek:
+            apiKeyEnv: DEEPSEEK_API_KEY
+            baseURL: !!js "process.env.DEEPSEEK_BASE_URL"
+          custom:
+            apiKeyEnv: CUSTOM_API_KEY
+            api: openai-completions
+            baseURL: !!js "process.env.CUSTOM_BASE_URL || process.env.OPENAI_BASE_URL || 'http://localhost:11434/v1'"
+            models:
+              - id: default
+                name: Default Custom Model
+                contextWindow: 128000
+                maxTokens: 4096
 
     - id: session-persistence-jsonl
       name: '@deepseek-ai/dsh-session-persistence-jsonl'

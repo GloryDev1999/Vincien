@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh",
-  "description": "dsh CLI: profile boot, plugin management, and the browser UI alias",
+  "description": "Vincien CLI: multi-provider AI agent harness with terminal REPL",
   "version": "0.1.0-rc.8",
   "publishConfig": {
     "access": "public"
@@ -12,6 +12,7 @@
   },
   "type": "module",
   "bin": {
+    "vincien": "lib/bin.js",
     "dsh": "lib/bin.js"
   },
   "files": [

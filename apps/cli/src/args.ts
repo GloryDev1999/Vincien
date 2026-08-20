@@ -1,17 +1,6 @@
 /**
- * Commander adapter for the `dsh` command line.
+ * Commander adapter for the `vincien` command line.
  *
- * The launcher parses only what it owns — which profile to boot, which extra
- * patch overlays to apply, and the config dumps — and hands **everything after
- * its own flags** to the booted tree verbatim, where injected app plugins parse
- * their own flag families and print their own `--help` (see
- * `@deepseek-ai/dsh-cmdline`). Launcher flags therefore come first: the first
- * token this parser does not recognize starts the inner arguments, so
- * `dsh --profile tui --resume abc` boots the tui profile with `--resume abc`,
- * and `dsh --profile web -h` prints the web app's help, not this one's.
- *
- * `web` is a hardcoded alias for `--profile web`; `plugin` manages a profile's
- * plugin dependencies by forwarding to pnpm.
  * @module @deepseek-ai/dsh/args
  */
 
@@ -44,14 +33,26 @@ interface PluginInvocation {
   args: string[]
 }
 
-/** The resolved `dsh` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
-export type DshInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation
+/** Boot interactive REPL mode. */
+interface InteractiveInvocation {
+  mode: 'interactive'
+  patches: string[]
+  args: string[]
+}
+
+/** The resolved `vincien` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
+export type DshInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | InteractiveInvocation
 
 /** Launcher flags shared by the default command and the `web` alias. */
 interface BootOptions {
   patch?: string[]
   dumpConfig?: boolean
   dumpDefaultConfig?: boolean
+  apiKey?: string
+  model?: string
+  provider?: string
+  baseUrl?: string
+  interactive?: boolean
 }
 
 /**
@@ -63,12 +64,12 @@ const collect = (value: string, previous: string[] = []): string[] => [...previo
 /** The launcher's own help text; each app prints its own. */
 const HELP_EXAMPLES = `
 Examples:
-  dsh --profile web                          boot the web profile (same as: dsh web)
-  dsh --profile headless "run the tests"     answer one task, print the result, and exit
-  dsh --profile tui --patch ./extra.yml      boot a custom profile with one extra overlay
-  dsh --profile tui --resume <session>       arguments after the launcher flags reach the app
-  dsh --profile web --help                   the web app's own flags and help
-  dsh plugin --profile tui add <package>     install a plugin into the tui profile
+  vincien "run the tests and explain failures"    answer one task, print the result, and exit
+  vincien                                         start interactive terminal REPL chat
+  vincien -i                                      start interactive terminal REPL chat
+  vincien --model gpt-4o "refactor this function" run task with specified model
+  vincien web                                     boot web UI (alias of --profile web)
+  vincien plugin --profile standard add <pkg>     install a plugin
 `
 
 /**
@@ -115,33 +116,57 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
   // inferred type would be circular through its own chain.
   const program: Command = new Command()
   program
-    .name('dsh')
+    .name('vincien')
     .version(version, '-V, --version', 'output the version number')
-    .description('dsh: boot a DeepSeek Harness profile — an ordered stack of plugin-bundle patch layers under your own overrides.')
+    .description('vincien: AI agent harness — multi-provider, tool-capable agent CLI.')
     .addHelpText('after', HELP_EXAMPLES)
     .exitOverride()
     // The launcher's flags come first and end at the first token it does not
     // know; everything from there on belongs to the booted app, including
-    // its -h. `dsh -h` with no profile still prints this help, below.
+    // its -h. `vincien -h` with no profile still prints this help, below.
     .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
     .enablePositionalOptions()
-    .argument('[args...]', 'arguments for the booted profile\'s app (see: dsh --profile <name> --help)')
+    .argument('[args...]', 'task text or arguments for the agent')
+    .option('-i, --interactive', 'start interactive terminal REPL chat session')
+    .option('--api-key <key>', 'LLM API key (or set in .env / env vars)')
+    .option('--model <model>', 'model name (e.g. gpt-4o, claude-3-7-sonnet, deepseek-chat)')
+    .option('--provider <provider>', 'provider name (openai, anthropic, deepseek, custom)')
+    .option('--base-url <url>', 'custom API base URL')
     .option('--profile <name>', 'the profile under $DSH_HOME/profiles to boot')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
     .option('--dump-config', 'print the composed profile tree and exit')
     .option('--dump-default-config', 'print the profile tree without its user layer or --patch overlays and exit')
     .action((args: string[], options: BootOptions & { profile?: string }) => {
-      // With the app owning -h, the launcher's own help is what a bare
-      // `dsh -h` (no profile to hand it to) must print.
-      if (options.profile === undefined) {
-        if (args.some(argument => argument === '-h' || argument === '--help')) program.help()
-        program.error('error: --profile <name> is required')
+      if (options.apiKey) {
+        if (options.provider === 'anthropic') process.env.ANTHROPIC_API_KEY = options.apiKey
+        else if (options.provider === 'deepseek') process.env.DEEPSEEK_API_KEY = options.apiKey
+        else if (options.provider === 'custom') process.env.CUSTOM_API_KEY = options.apiKey
+        else process.env.OPENAI_API_KEY = options.apiKey
+        process.env.LLM_API_KEY = options.apiKey
       }
-      const profile = options.profile
-      if (profile === '') program.error('error: --profile needs a name')
-      resolved = resolveBoot(program, profile, options, args)
+      if (options.model) process.env.LLM_MODEL = options.model
+      if (options.provider) process.env.LLM_PROVIDER = options.provider
+      if (options.baseUrl) process.env.CUSTOM_BASE_URL = options.baseUrl
+
+      if (args.some(argument => argument === '-h' || argument === '--help')) {
+        program.help()
+      }
+
+      if (options.profile !== undefined) {
+        const profile = options.profile
+        if (profile === '') program.error('error: --profile needs a name')
+        resolved = resolveBoot(program, profile, options, args)
+        return
+      }
+
+      if (options.interactive || args.length === 0) {
+        resolved = { mode: 'interactive', patches: options.patch ?? [], args }
+        return
+      }
+
+      resolved = resolveBoot(program, 'headless', options, args)
     })
 
   /** Reject parent options supplied before a subcommand. */
@@ -159,7 +184,7 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
     .allowUnknownOption()
     .passThroughOptions()
     .enablePositionalOptions()
-    .argument('[args...]', 'arguments for the web app (see: dsh web --help)')
+    .argument('[args...]', 'arguments for the web app (see: vincien web --help)')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
     .option('--dump-config', 'print the composed web-profile tree (with the user layer and any --patch) and exit')
     .option('--dump-default-config', 'print the web profile\'s bundle layers (no user layer) and exit')
@@ -186,6 +211,6 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
     return process.exit(error instanceof CommanderError ? error.exitCode : 1)
   }
   /* v8 ignore next -- an action resolves or Commander throws */
-  if (resolved === undefined) throw new Error('dsh: no invocation resolved')
+  if (resolved === undefined) throw new Error('vincien: no invocation resolved')
   return resolved
 }

@@ -1,15 +1,15 @@
 {
   "id": "/",
-  "name": "DeepSeek Harness",
-  "short_name": "DSH",
+  "name": "Vincien",
+  "short_name": "Vincien",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/bear.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

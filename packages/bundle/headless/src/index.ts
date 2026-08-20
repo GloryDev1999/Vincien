@@ -83,7 +83,7 @@ function summarize(events: readonly SessionEvent[], firstSeq: number): RunOutcom
 
 /** Report an unexpected direct-driver failure and request a failing exit. */
 function fail(io: HeadlessIo, error: unknown): void {
-  io.stderr.write(`dsh: ${error instanceof Error ? error.message : String(error)}\n`)
+  io.stderr.write(`vincien: ${error instanceof Error ? error.message : String(error)}\n`)
   io.exit(1)
 }
 
@@ -104,6 +104,22 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   if (agents === undefined || defaultModel === undefined || sessions === undefined) return
 
   const selection = defaultModel.currentSelection()
+  if (!selection.provider || !selection.model) {
+    io.stderr.write(
+      'vincien: No LLM API or model configured!\n' +
+      'Please plug in an API to use Vincien. You can:\n' +
+      '  1. Configure .env or export environment variables:\n' +
+      '     - export OPENAI_API_KEY="sk-..." (Model: gpt-4o)\n' +
+      '     - export ANTHROPIC_API_KEY="sk-ant-..." (Model: claude-3-7-sonnet)\n' +
+      '     - export DEEPSEEK_API_KEY="sk-..." (Model: deepseek-chat)\n' +
+      '     - export CUSTOM_API_KEY="sk-..." & CUSTOM_BASE_URL="http://..."\n' +
+      '  2. Or run interactive mode to configure:\n' +
+      '     pnpm vincien\n',
+    )
+    io.exit(1)
+    return
+  }
+
   // This bundle composes no preset roster, so the model-facing rows sit in the
   // host plane and the agent reads them from the global layer. A deployment
   // that DOES configure one has to join it here first
@@ -128,7 +144,7 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   const outcome = summarize(agent.session.events, firstSeq)
   io.stdout.write(outcome.text + '\n')
   if (outcome.reason?.kind === 'error') {
-    io.stderr.write(`dsh: ${outcome.reason.error.code}: ${outcome.reason.error.message}\n`)
+    io.stderr.write(`vincien: ${outcome.reason.error.code}: ${outcome.reason.error.message}\n`)
   }
   io.exit(outcome.reason?.kind === 'completed' ? 0 : 1)
 }

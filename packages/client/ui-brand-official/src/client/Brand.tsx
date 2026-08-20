@@ -1,4 +1,3 @@
-import { BrandWordmark, FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { HeroBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SidebarBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 
@@ -7,10 +6,10 @@ type OfficialBrandMarkProps = HeroBrandMarkOwnerProps & SidebarBrandMarkOwnerPro
 /**
  * Render the official mark with the presentation requested by its host surface.
  * @param props - Host-supplied mark presentation.
- * @returns the official whale mark.
+ * @returns the official bear mark.
  */
-export function OfficialBrandMark({ size, className }: OfficialBrandMarkProps) {
-  return <FishLogo size={size} className={className} />
+export function OfficialBrandMark({ size = 24, className }: OfficialBrandMarkProps) {
+  return <img src="/bear.png" alt="Vincien" width={size} height={size} className={className} style={{ objectFit: 'contain' }} />
 }
 
 /**
@@ -18,5 +17,9 @@ export function OfficialBrandMark({ size, className }: OfficialBrandMarkProps) {
  * @returns the official name wordmark.
  */
 export function OfficialBrandName() {
-  return <BrandWordmark includeMark={false} />
+  return (
+    <span style={{ fontWeight: 'bold', fontSize: '1.25rem', letterSpacing: '0.05em' }}>
+      Vincien
+    </span>
+  )
 }
