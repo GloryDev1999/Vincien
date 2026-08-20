@@ -104,6 +104,10 @@
             api: openai-completions
             baseURL: !!js "process.env.CUSTOM_BASE_URL || process.env.OPENAI_BASE_URL || 'http://localhost:11434/v1'"
             models:
+              - id: !!js "process.env.LLM_MODEL || 'default'"
+                name: !!js "process.env.LLM_MODEL || 'default'"
+                contextWindow: 128000
+                maxTokens: 4096
               - id: default
                 name: Default Custom Model
                 contextWindow: 128000

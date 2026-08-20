@@ -133,6 +133,21 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
       installModelSelection(agentCtx, selected)
     },
   })
+
+  let streamed = false
+  ctx.on('session/event', (_session, event: SessionEvent) => {
+    if (event.type === 'assistant/chunk') {
+      if (event.data.chunk.type === 'text-delta') {
+        streamed = true
+        io.stdout.write(event.data.chunk.text)
+      }
+    } else if (event.type === 'tool/call') {
+      const argsStr = event.data.arguments
+      const preview = argsStr.length > 100 ? argsStr.slice(0, 100) + '...' : argsStr
+      io.stdout.write(`\n[Tool: ${event.data.name}] ${preview}\n`)
+    }
+  })
+
   await agent.whenIdle()
   const firstSeq = agent.session.seq
   agent.followup(createUserMessage({
@@ -142,7 +157,11 @@ async function run(ctx: Context, task: string, io: HeadlessIo): Promise<void> {
   await agent.whenIdle()
   await sessions.flush(agent.session)
   const outcome = summarize(agent.session.events, firstSeq)
-  io.stdout.write(outcome.text + '\n')
+  if (!streamed) {
+    io.stdout.write(outcome.text + '\n')
+  } else {
+    io.stdout.write('\n')
+  }
   if (outcome.reason?.kind === 'error') {
     io.stderr.write(`vincien: ${outcome.reason.error.code}: ${outcome.reason.error.message}\n`)
   }

@@ -13,6 +13,7 @@ import { appendFileSync } from 'node:fs'
 import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { installModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
@@ -149,12 +150,13 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
   console.log(`\x1b[36mModel đang hoạt động:\x1b[0m \x1b[1m${currentConfig.model}\x1b[0m (\x1b[33m${currentConfig.provider}\x1b[0m)`)
   console.log('\x1b[90mGõ câu hỏi / yêu cầu để bắt đầu. Gõ /help để xem trợ giúp, /exit để thoát.\x1b[0m\n')
 
-  // Boot profile
+  // Boot profile with interactive overlay (disabling one-shot runner to keep context active)
+  const interactivePatchPath = fileURLToPath(new URL('../config/interactive.patch.yml', import.meta.url))
   const { ctx, shutdown } = await runProfile({
     environment: options.environment,
     profile: 'headless',
-    patchFiles: options.patchFiles,
-    args: ['interactive-placeholder'],
+    patchFiles: [interactivePatchPath, ...options.patchFiles],
+    args: [],
   })
 
   // Settlement await
@@ -183,14 +185,42 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
     },
   })
 
-  // Subscribe to session events for real-time tool & response reporting
+  let hasPrintedAssistantPrefix = false
+  let isReasoning = false
+
+  // Subscribe to session events for real-time streaming tool & response reporting
   ctx.on('session/event', (_session, event: SessionEvent) => {
     if (event.type === 'turn/start') {
+      hasPrintedAssistantPrefix = false
+      isReasoning = false
       process.stdout.write('\x1b[36m[Vincien suy nghĩ...]\x1b[0m\n')
+    } else if (event.type === 'assistant/chunk') {
+      const chunk = event.data.chunk
+      if (chunk.type === 'reasoning-delta') {
+        if (!isReasoning) {
+          isReasoning = true
+          process.stdout.write('\x1b[90m')
+        }
+        process.stdout.write(chunk.text)
+      } else if (chunk.type === 'text-delta') {
+        if (isReasoning) {
+          isReasoning = false
+          process.stdout.write('\x1b[0m\n')
+        }
+        if (!hasPrintedAssistantPrefix) {
+          hasPrintedAssistantPrefix = true
+          process.stdout.write('\n\x1b[1m\x1b[36mVincien:\x1b[0m\n')
+        }
+        process.stdout.write(chunk.text)
+      }
     } else if (event.type === 'tool/call') {
+      if (isReasoning) {
+        isReasoning = false
+        process.stdout.write('\x1b[0m\n')
+      }
       const argsStr = event.data.arguments
       const preview = argsStr.length > 120 ? argsStr.slice(0, 120) + '...' : argsStr
-      process.stdout.write(`\x1b[33m⚙ [Tool: ${event.data.name}]\x1b[0m ${preview}\n`)
+      process.stdout.write(`\n\x1b[33m⚙ [Tool: ${event.data.name}]\x1b[0m ${preview}\n`)
     } else if (event.type === 'tool/result') {
       const innerBlocks = event.data.message.content.flatMap(tr => tr.content)
       const textBlocks = innerBlocks
@@ -199,15 +229,12 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
         .join('')
       const preview = textBlocks.length > 150 ? textBlocks.slice(0, 150) + '...' : textBlocks
       process.stdout.write(`\x1b[32m✔ [Result]\x1b[0m ${preview.trim()}\n`)
-    } else if (event.type === 'assistant/message') {
-      const textBlocks = event.data.message.content
-        .filter(b => b.type === 'text')
-        .map(b => (b as { text: string }).text)
-        .join('')
-      if (textBlocks) {
-        process.stdout.write(`\n\x1b[1m\x1b[36mVincien:\x1b[0m\n${textBlocks}\n\n`)
-      }
     } else if (event.type === 'turn/end') {
+      if (isReasoning) {
+        isReasoning = false
+        process.stdout.write('\x1b[0m\n')
+      }
+      process.stdout.write('\n\n')
       if (event.data.reason?.kind === 'error') {
         process.stdout.write(`\x1b[31m[Lỗi: ${event.data.reason.error.code}] ${event.data.reason.error.message}\x1b[0m\n\n`)
       }
