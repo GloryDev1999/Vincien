@@ -134,10 +134,84 @@ async function ensureApiConfig(rl: ReturnType<typeof createInterface>, force = f
 }
 
 /**
+ * Dynamic bouncing loading bar animation for terminal while waiting for LLM or tool results.
+ */
+class LoadingAnimation {
+  private timer: NodeJS.Timeout | null = null
+  private frameIndex = 0
+  private direction = 1
+  private text: string
+  private active = false
+  private readonly barWidth = 14
+  private readonly blockWidth = 4
+
+  constructor(text = 'Vincien đang suy nghĩ...') {
+    this.text = text
+  }
+
+  start(text?: string): void {
+    if (text) this.text = text
+    if (this.active) return
+    this.active = true
+    this.frameIndex = 0
+    this.direction = 1
+
+    const maxPos = this.barWidth - this.blockWidth
+
+    this.timer = setInterval(() => {
+      if (!this.active) return
+
+      let bar = ''
+      for (let i = 0; i < this.barWidth; i++) {
+        if (i >= this.frameIndex && i < this.frameIndex + this.blockWidth) {
+          bar += '━'
+        } else {
+          bar += '╌'
+        }
+      }
+
+      process.stdout.write(`\r\x1b[K\x1b[36m[${bar}]\x1b[0m \x1b[33m🐾 ${this.text}\x1b[0m`)
+
+      this.frameIndex += this.direction
+      if (this.frameIndex >= maxPos) {
+        this.direction = -1
+        this.frameIndex = maxPos
+      } else if (this.frameIndex <= 0) {
+        this.direction = 1
+        this.frameIndex = 0
+      }
+    }, 60)
+  }
+
+  stop(): void {
+    if (!this.active) return
+    this.active = false
+    if (this.timer !== null) {
+      clearInterval(this.timer)
+      this.timer = null
+    }
+    process.stdout.write('\r\x1b[K')
+  }
+}
+
+function printHeaderBox(provider: string, model: string): void {
+  console.log(BEAR_BANNER)
+  const title = `🐾 Vincien AI Assistant  •  Model: ${model} (${provider})`
+  const shortcuts = 'Phím tắt: /help  •  /config (đổi API)  •  /model  •  /clear  •  /exit'
+  const width = Math.max(title.length, shortcuts.length) + 6
+  const top = '╭' + '─'.repeat(width) + '╮'
+  const bot = '╰' + '─'.repeat(width) + '╯'
+
+  console.log(`\x1b[36m${top}\x1b[0m`)
+  console.log(`\x1b[36m│\x1b[0m  \x1b[1m\x1b[37m${title.padEnd(width - 2)}\x1b[0m\x1b[36m│\x1b[0m`)
+  console.log(`\x1b[36m│\x1b[0m  \x1b[90m${shortcuts.padEnd(width - 2)}\x1b[0m\x1b[36m│\x1b[0m`)
+  console.log(`\x1b[36m${bot}\x1b[0m\n`)
+}
+
+/**
  * Launch the interactive Vincien REPL.
  */
 export async function runInteractive(options: InteractiveOptions): Promise<void> {
-  console.log(BEAR_BANNER)
   const rl = createInterface({ input, output })
 
   let currentConfig: { provider: string; model: string }
@@ -149,8 +223,7 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
     process.exit(1)
   }
 
-  console.log(`\x1b[36mModel đang hoạt động:\x1b[0m \x1b[1m${currentConfig.model}\x1b[0m (\x1b[33m${currentConfig.provider}\x1b[0m)`)
-  console.log('\x1b[90mGõ câu hỏi / yêu cầu để bắt đầu. Gõ /help để xem trợ giúp, /exit để thoát.\x1b[0m\n')
+  printHeaderBox(currentConfig.provider, currentConfig.model)
 
   // Boot profile with interactive overlay (disabling one-shot runner to keep context active)
   const interactivePatchPath = fileURLToPath(new URL('../config/interactive.patch.yml', import.meta.url))
@@ -187,6 +260,7 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
     },
   })
 
+  const loading = new LoadingAnimation()
   let hasPrintedAssistantPrefix = false
   let isReasoning = false
 
@@ -195,50 +269,59 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
     if (event.type === 'turn/start') {
       hasPrintedAssistantPrefix = false
       isReasoning = false
-      process.stdout.write('\x1b[36m[Vincien suy nghĩ...]\x1b[0m\n')
+      loading.start('Vincien đang suy nghĩ...')
     } else if (event.type === 'assistant/chunk') {
       const chunk = event.data.chunk
       if (chunk.type === 'reasoning-delta') {
+        loading.stop()
         if (!isReasoning) {
           isReasoning = true
           process.stdout.write('\x1b[90m')
         }
         process.stdout.write(chunk.text)
       } else if (chunk.type === 'text-delta') {
+        loading.stop()
         if (isReasoning) {
           isReasoning = false
           process.stdout.write('\x1b[0m\n')
         }
         if (!hasPrintedAssistantPrefix) {
           hasPrintedAssistantPrefix = true
-          process.stdout.write('\n\x1b[1m\x1b[36mVincien:\x1b[0m\n')
+          process.stdout.write('\n\x1b[36m╭─── [ 🐾 Vincien ] ────────────────────────────────────────────────────────\x1b[0m\n')
         }
         process.stdout.write(chunk.text)
       }
     } else if (event.type === 'tool/call') {
+      loading.stop()
       if (isReasoning) {
         isReasoning = false
         process.stdout.write('\x1b[0m\n')
       }
       const argsStr = event.data.arguments
       const preview = argsStr.length > 120 ? argsStr.slice(0, 120) + '...' : argsStr
-      process.stdout.write(`\n\x1b[33m⚙ [Tool: ${event.data.name}]\x1b[0m ${preview}\n`)
+      process.stdout.write(`\n\x1b[33m⚙ [Tool: ${event.data.name}]\x1b[0m \x1b[90m${preview}\x1b[0m\n`)
+      loading.start(`Đang thực thi: ${event.data.name}...`)
     } else if (event.type === 'tool/result') {
+      loading.stop()
       const innerBlocks = event.data.message.content.flatMap(tr => tr.content)
       const textBlocks = innerBlocks
         .filter(b => b.type === 'text')
         .map(b => (b as { text: string }).text)
         .join('')
       const preview = textBlocks.length > 150 ? textBlocks.slice(0, 150) + '...' : textBlocks
-      process.stdout.write(`\x1b[32m✔ [Result]\x1b[0m ${preview.trim()}\n`)
+      process.stdout.write(`\x1b[32m✔ [Result]\x1b[0m \x1b[90m${preview.trim()}\x1b[0m\n`)
+      loading.start('Vincien đang xử lý kết quả...')
     } else if (event.type === 'turn/end') {
+      loading.stop()
       if (isReasoning) {
         isReasoning = false
         process.stdout.write('\x1b[0m\n')
       }
-      process.stdout.write('\n\n')
+      if (hasPrintedAssistantPrefix) {
+        process.stdout.write('\n\x1b[36m╰───────────────────────────────────────────────────────────────────────────\x1b[0m\n')
+      }
       if (event.data.reason?.kind === 'error') {
-        process.stdout.write(`\x1b[31m[Lỗi: ${event.data.reason.error.code}] ${event.data.reason.error.message}\x1b[0m\n\n`)
+        process.stdout.write(`\n\x1b[31m[Lỗi: ${event.data.reason.error.code}] ${event.data.reason.error.message}\x1b[0m\n`)
       }
     }
   })
@@ -246,7 +329,9 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
   const promptLoop = async (): Promise<void> => {
     while (true) {
       try {
-        const userInput = await rl.question('\x1b[1m\x1b[35mvincien>\x1b[0m ')
+        console.log('\n\x1b[90m╭─── [ 👤 Bạn ] ───────────────────────────────────────────────────────────\x1b[0m')
+        const userInput = await rl.question('\x1b[90m│ > \x1b[0m\x1b[1m\x1b[37m')
+        process.stdout.write('\x1b[0m\x1b[90m╰───────────────────────────────────────────────────────────────────────────\x1b[0m\n')
         const trimmed = userInput.trim()
 
         if (!trimmed) continue
@@ -258,7 +343,7 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
 
         if (trimmed === '/clear') {
           console.clear()
-          console.log(BEAR_BANNER)
+          printHeaderBox(selection.provider, selection.model)
           continue
         }
 
