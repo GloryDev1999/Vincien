@@ -9,7 +9,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { appendFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import { resolve } from 'node:path'
@@ -63,15 +63,17 @@ function getActiveConfig(): { provider: string; model: string; hasKey: boolean }
 }
 
 /**
- * Run interactive API setup wizard if no API is plugged in.
+ * Run interactive API setup wizard if no API is plugged in (or when forced via /config).
  */
-async function ensureApiConfig(rl: ReturnType<typeof createInterface>): Promise<{ provider: string; model: string }> {
-  const active = getActiveConfig()
-  if (active.hasKey && active.provider && active.model) {
-    return { provider: active.provider, model: active.model }
+async function ensureApiConfig(rl: ReturnType<typeof createInterface>, force = false): Promise<{ provider: string; model: string }> {
+  if (!force) {
+    const active = getActiveConfig()
+    if (active.hasKey && active.provider && active.model) {
+      return { provider: active.provider, model: active.model }
+    }
   }
 
-  console.log('\x1b[33m\n[Vincien Setup] Chưa phát hiện cấu hình API Model.\x1b[0m')
+  console.log('\x1b[33m\n[Vincien Setup] Cấu hình API Model.\x1b[0m')
   console.log('Vui lòng chọn nhà cung cấp AI để cắm (plug-in) vào Vincien:\n')
   console.log('  1) \x1b[1mOpenAI\x1b[0m (GPT-4o, o3-mini, GPT-4.5)')
   console.log('  2) \x1b[1mAnthropic Claude\x1b[0m (Claude 3.7 Sonnet, Claude 3.5 Sonnet)')
@@ -115,15 +117,15 @@ async function ensureApiConfig(rl: ReturnType<typeof createInterface>): Promise<
   try {
     const envPath = resolve(process.cwd(), '.env')
     const envLines = [
-      '\n# Vincien API Configuration',
+      '# Vincien API Configuration',
       `${keyEnvName}=${apiKey || 'dummy-key'}`,
       `LLM_PROVIDER=${provider}`,
       `LLM_MODEL=${model}`,
       baseUrl ? `CUSTOM_BASE_URL=${baseUrl}` : '',
     ].filter(Boolean).join('\n') + '\n'
 
-    appendFileSync(envPath, envLines)
-    console.log(`\x1b[32m✔ Đã lưu cấu hình API vào ${envPath}\x1b[0m\n`)
+    writeFileSync(envPath, envLines)
+    console.log(`\x1b[32m✔ Đã lưu cấu hình API mới vào ${envPath}\x1b[0m\n`)
   } catch {
     console.log('\x1b[33m✔ Đã thiết lập cấu hình trong phiên làm việc hiện tại.\x1b[0m\n')
   }
@@ -264,8 +266,17 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
           console.log('\n\x1b[1mDanh sách lệnh Vincien CLI:\x1b[0m')
           console.log('  /help    - Hiển thị trợ giúp')
           console.log('  /model   - Xem thông tin model đang dùng')
+          console.log('  /config  - Thay đổi API Key, Model, hoặc Nhà cung cấp AI')
           console.log('  /clear   - Xoá màn hình terminal')
           console.log('  /exit    - Thoát phiên làm việc\n')
+          continue
+        }
+
+        if (trimmed === '/config' || trimmed === '/api' || trimmed === '/setup') {
+          const updated = await ensureApiConfig(rl, true)
+          selection.provider = updated.provider
+          selection.model = updated.model
+          console.log(`\x1b[32m✔ Đã chuyển sang model: ${updated.model} (${updated.provider})\x1b[0m\n`)
           continue
         }
 
