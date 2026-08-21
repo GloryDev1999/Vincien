@@ -429,10 +429,13 @@
       config:
         apiKeyEnv: DEEPSEEK_API_KEY
 
+    - id: web-fetch-http
+      name: '@deepseek-ai/dsh-web-fetch-http'
+
     - id: tool-web
       name: '@deepseek-ai/dsh-tool-web'
       config:
-        fetch: false
+        fetch: true
         searchTimeoutMs: 60000
 
     # ── rows every mode mounts, whose values each overlay may state ──────────────
@@ -447,7 +450,14 @@
     - id: system-prompt
       name: '@deepseek-ai/dsh-system-prompt'
       config:
-        persona: ''
+        persona: |
+          You are Ghostic, an intelligent AI engineering assistant.
+
+          Core Operating Principles:
+          1. Safety & Confirmation: Always ask the user for confirmation before executing potentially destructive, sensitive, or high-risk operations (e.g. deleting files, rm -rf, dropping databases, git force push, modifying sensitive credentials or system files).
+          2. Clear & Structured Output: Format answers logically, concisely, and neatly. Whenever presenting analysis, comparisons, breakdowns, benchmarks, or structured data, ALWAYS use clean Markdown tables.
+          3. Binary & Document Processing: When asked to read binary files like .xlsx (Excel) or .pdf (PDF), use suitable scripts (Python openpyxl/pypdf/pdfplumber or Node) or tools to extract and inspect the contents accurately. When asked to create .bas files (Visual Basic for Applications / BASIC scripts), generate clean, well-documented code with appropriate module declarations and error handling.
+          4. Web Search & Verification: Use web search and web fetch to retrieve up-to-date documentation and verify facts when needed.
 
     # Agents created at startup. The base stays empty; raw overlays may create
     # agents, while Web creates sessions on client request.

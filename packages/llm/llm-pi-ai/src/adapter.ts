@@ -222,19 +222,20 @@ export class PiAiAdapter extends LlmAdapter {
   /** The configured descriptor for one exact route/model pair within one snapshot. */
   private modelOf(snapshot: PiAiSnapshot, provider: string, model: string): Model<Api> {
     this.profileOf(snapshot, provider)
-    let resolved = snapshot.models.getModel(provider, model)
+    const resolved = snapshot.models.getModel(provider, model)
     if (resolved === undefined) {
-      const existing = snapshot.models.getModels(provider)
-      const template = existing[0]
-      if (template !== undefined) {
-        resolved = {
-          ...template,
-          id: model,
-          name: model,
+      if (provider === 'custom') {
+        const existing = snapshot.models.getModels(provider)
+        const template = existing[0]
+        if (template !== undefined) {
+          return {
+            ...template,
+            id: model,
+            name: model,
+          }
         }
-      } else {
-        throw new LlmError(`pi-ai provider "${provider}" has no configured model "${model}"`, 'UNKNOWN_MODEL')
       }
+      throw new LlmError(`pi-ai provider "${provider}" has no configured model "${model}"`, 'UNKNOWN_MODEL')
     }
     return resolved
   }

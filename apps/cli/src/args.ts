@@ -40,7 +40,7 @@ interface InteractiveInvocation {
   args: string[]
 }
 
-/** The resolved `vincien` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
+/** The resolved `ghostic` invocation. Help, version, and errors exit inside {@link parseDshArgs}. */
 export type DshInvocation = ProfileInvocation | DumpConfigInvocation | PluginInvocation | InteractiveInvocation
 
 /** Launcher flags shared by the default command and the `web` alias. */
@@ -64,12 +64,12 @@ const collect = (value: string, previous: string[] = []): string[] => [...previo
 /** The launcher's own help text; each app prints its own. */
 const HELP_EXAMPLES = `
 Examples:
-  vincien "run the tests and explain failures"    answer one task, print the result, and exit
-  vincien                                         start interactive terminal REPL chat
-  vincien -i                                      start interactive terminal REPL chat
-  vincien --model gpt-4o "refactor this function" run task with specified model
-  vincien web                                     boot web UI (alias of --profile web)
-  vincien plugin --profile standard add <pkg>     install a plugin
+  ghostic "run the tests and explain failures"    answer one task, print the result, and exit
+  ghostic                                         start interactive terminal REPL chat
+  ghostic -i                                      start interactive terminal REPL chat
+  ghostic --model gpt-4o "refactor this function" run task with specified model
+  ghostic web                                     boot web UI (alias of --profile web)
+  ghostic plugin --profile standard add <pkg>     install a plugin
 `
 
 /**
@@ -116,14 +116,14 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
   // inferred type would be circular through its own chain.
   const program: Command = new Command()
   program
-    .name('vincien')
+    .name('ghostic')
     .version(version, '-V, --version', 'output the version number')
-    .description('vincien: AI agent harness — multi-provider, tool-capable agent CLI.')
+    .description('ghostic: AI agent harness — multi-provider, tool-capable agent CLI.')
     .addHelpText('after', HELP_EXAMPLES)
     .exitOverride()
     // The launcher's flags come first and end at the first token it does not
     // know; everything from there on belongs to the booted app, including
-    // its -h. `vincien -h` with no profile still prints this help, below.
+    // its -h. `ghostic -h` with no profile still prints this help, below.
     .helpOption(false)
     .allowUnknownOption()
     .passThroughOptions()
@@ -150,10 +150,6 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
       if (options.provider) process.env.LLM_PROVIDER = options.provider
       if (options.baseUrl) process.env.CUSTOM_BASE_URL = options.baseUrl
 
-      if (args.some(argument => argument === '-h' || argument === '--help')) {
-        program.help()
-      }
-
       if (options.profile !== undefined) {
         const profile = options.profile
         if (profile === '') program.error('error: --profile needs a name')
@@ -161,9 +157,21 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
         return
       }
 
+      if (args.some(argument => argument === '-h' || argument === '--help')) {
+        program.help()
+      }
+
+      if (options.dumpConfig || options.dumpDefaultConfig) {
+        program.error('error: --dump-config requires --profile')
+      }
+
       if (options.interactive || args.length === 0) {
         resolved = { mode: 'interactive', patches: options.patch ?? [], args }
         return
+      }
+
+      if (args[0]?.startsWith('-')) {
+        program.error(`error: unknown option '${args[0]}'`)
       }
 
       resolved = resolveBoot(program, 'headless', options, args)
@@ -184,7 +192,7 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
     .allowUnknownOption()
     .passThroughOptions()
     .enablePositionalOptions()
-    .argument('[args...]', 'arguments for the web app (see: vincien web --help)')
+    .argument('[args...]', 'arguments for the web app (see: ghostic web --help)')
     .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
     .option('--dump-config', 'print the composed web-profile tree (with the user layer and any --patch) and exit')
     .option('--dump-default-config', 'print the web profile\'s bundle layers (no user layer) and exit')
@@ -211,6 +219,6 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
     return process.exit(error instanceof CommanderError ? error.exitCode : 1)
   }
   /* v8 ignore next -- an action resolves or Commander throws */
-  if (resolved === undefined) throw new Error('vincien: no invocation resolved')
+  if (resolved === undefined) throw new Error('ghostic: no invocation resolved')
   return resolved
 }

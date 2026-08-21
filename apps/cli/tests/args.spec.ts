@@ -70,12 +70,15 @@ describe('parseDshArgs', () => {
       .toEqual({ mode: 'dump-config', profile: 'web', defaultOnly: true, patches: [] })
   })
 
-  it('rejects missing profile, removed flags, and contradictory inputs', () => {
-    expect(exitCode([])).toBe(1)
-    expect(exitCode(['tui'])).toBe(1) // an app argument without --profile has no app to reach
+  it('routes interactive REPL mode when given -i or no profile/task', () => {
+    expect(parse([])).toEqual({ mode: 'interactive', patches: [], args: [] })
+    expect(parse(['-i'])).toEqual({ mode: 'interactive', patches: [], args: [] })
+    expect(parse(['--interactive', '--patch', 'p.yml'])).toEqual({ mode: 'interactive', patches: ['p.yml'], args: [] })
+  })
+
+  it('rejects removed flags and contradictory inputs', () => {
     expect(exitCode(['--config', 'c.yml'])).toBe(1) // removed
     expect(exitCode(['-p', 'task'])).toBe(1) // removed
-    expect(exitCode(['run', 'task'])).toBe(1) // app-owned task replaced the launcher subcommand
     expect(exitCode(['--profile', ''])).toBe(1)
     expect(exitCode(['--profile', 'x', '--patch='])).toBe(1)
     expect(exitCode(['--dump-config'])).toBe(1)

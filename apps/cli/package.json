@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh",
-  "description": "Vincien CLI: multi-provider AI agent harness with terminal REPL",
+  "description": "Ghostic CLI: multi-provider AI agent harness with terminal REPL",
   "version": "0.1.0-rc.8",
   "publishConfig": {
     "access": "public"
@@ -12,6 +12,7 @@
   },
   "type": "module",
   "bin": {
+    "ghostic": "lib/bin.js",
     "vincien": "lib/bin.js",
     "dsh": "lib/bin.js"
   },
@@ -32,7 +33,9 @@
     "@deepseek-ai/dsh-client-ui-agent-preset": "workspace:^",
     "@deepseek-ai/dsh-client-ui-cordis": "workspace:^",
     "@deepseek-ai/dsh-command-compact": "workspace:^",
+    "@deepseek-ai/dsh-command-feedback": "workspace:^",
     "@deepseek-ai/dsh-command-goal": "workspace:^",
+    "@deepseek-ai/dsh-commands": "workspace:^",
     "@deepseek-ai/dsh-compaction-basic": "workspace:^",
     "@deepseek-ai/dsh-compaction-tool-result-pruner": "workspace:^",
     "@deepseek-ai/dsh-goal": "workspace:^",
@@ -79,20 +82,21 @@
     "@deepseek-ai/dsh-web-app": "workspace:^",
     "@deepseek-ai/dsh-workflow-worker-thread": "workspace:^",
     "@deepseek-ai/dsh-agent-instructions": "workspace:^",
+    "@deepseek-ai/dsh-agent": "workspace:^",
+    "@deepseek-ai/dsh-llm": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^",
+    "@deepseek-ai/dsh-tools": "workspace:^",
     "commander": "^15.0.0",
     "@deepseek-ai/cordis": "workspace:^",
     "js-yaml": "^4.2.0",
     "node-addon-require-builtin": "^0.1.4"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-host-frontend-static": "workspace:^",
     "@deepseek-ai/dsh-host-apiproxy": "workspace:^",
     "@deepseek-ai/dsh-host-webserver": "workspace:^",
-    "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-llm-mock-server": "workspace:^",
     "@deepseek-ai/dsh-loader-smoke": "workspace:^",
-    "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-settings": "workspace:^",
     "@deepseek-ai/dsh-subagent": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",

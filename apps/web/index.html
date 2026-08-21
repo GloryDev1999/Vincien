@@ -6,9 +6,27 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/png" href="/bear.png" />
     <title>Vincien</title>
+    <style>
+      .bear {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 100px;
+        height: auto;
+        animation: bear-bounce 2s infinite;
+        z-index: 1000;
+        pointer-events: none;
+        user-select: none;
+      }
+      @keyframes bear-bounce {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(5deg); }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <img src="/bear.png" alt="Bear" class="bear" />
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

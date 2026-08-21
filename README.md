@@ -10,6 +10,29 @@ It uses an architecture where **everything is a plugin**, and is powered by [Cor
 
 DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
 
+## 🚀 Ghostic CLI — One-Line Installation
+
+Cài đặt và sử dụng Ghostic CLI trên bất kỳ máy tính nào chỉ với **1 dòng lệnh duy nhất**:
+
+### Linux & macOS:
+```bash
+curl -fsSL https://raw.githubusercontent.com/GloryDev1999/Ghostic/master/install.sh | bash
+```
+
+### Windows (PowerShell):
+```powershell
+irm https://raw.githubusercontent.com/GloryDev1999/Ghostic/master/install.ps1 | iex
+```
+
+Sau khi cài đặt xong, bạn có thể gõ `ghostic` ở bất kỳ terminal nào:
+```bash
+ghostic              # Khởi động giao diện chat tương tác (REPL)
+ghostic "nhiệm vụ"   # Chạy 1 tác vụ tự động
+ghostic web          # Khởi động giao diện Web UI
+```
+
+---
+
 ## Run
 
 ### Run from `npm`
