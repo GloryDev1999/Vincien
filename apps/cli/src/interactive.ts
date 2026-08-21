@@ -403,6 +403,7 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
   let isReasoning = false
   let reasoningClosed = false
   let thinkingStartTime = 0
+  let streamedTextLength = 0
 
   const closeReasoningBlock = (): void => {
     if (isReasoning && !reasoningClosed) {
@@ -421,6 +422,7 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
       hasPrintedAssistantPrefix = false
       isReasoning = false
       reasoningClosed = false
+      streamedTextLength = 0
       thinkingStartTime = Date.now()
       loading.start('Ghostic đang suy nghĩ...', 'dots')
     } else if (event.type === 'assistant/chunk') {
@@ -441,7 +443,30 @@ export async function runInteractive(options: InteractiveOptions): Promise<void>
           const aTop = `\n\x1b[35m─── [ 👻 Ghostic${planSuffix} ] ${'─'.repeat(Math.max(4, width - (planSuffix ? 31 : 19)))}\x1b[0m\n`
           process.stdout.write(aTop)
         }
+        streamedTextLength += chunk.text.length
         process.stdout.write(`\x1b[0m\x1b[37m${chunk.text}`)
+      }
+    } else if (event.type === 'assistant/message') {
+      // Non-streaming or buffered fallback: if no text was streamed in chunks, render the full message
+      if (streamedTextLength === 0) {
+        const textBlocks = event.data.message.content
+          .filter(b => b.type === 'text')
+          .map(b => (b as { text: string }).text)
+          .join('')
+
+        if (textBlocks.trim().length > 0) {
+          loading.stop()
+          closeReasoningBlock()
+
+          if (!hasPrintedAssistantPrefix) {
+            hasPrintedAssistantPrefix = true
+            const planSuffix = isPlanModeActive(agent.session.events) ? ' (Plan Mode)' : ''
+            const aTop = `\n\x1b[35m─── [ 👻 Ghostic${planSuffix} ] ${'─'.repeat(Math.max(4, width - (planSuffix ? 31 : 19)))}\x1b[0m\n`
+            process.stdout.write(aTop)
+          }
+          streamedTextLength += textBlocks.length
+          process.stdout.write(`\x1b[0m\x1b[37m${textBlocks}`)
+        }
       }
     } else if (event.type === 'tool/call') {
       loading.stop()
