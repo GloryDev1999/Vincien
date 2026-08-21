@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Ghostic CLI — One-Line Installer for Linux & macOS
+# Ghostic CLI — Fast One-Line Installer for Linux & macOS
 # Usage: curl -fsSL https://raw.githubusercontent.com/GloryDev1999/Ghostic/master/install.sh | bash
 # ==============================================================================
 
@@ -23,14 +23,14 @@ INSTALL_DIR="${GHOSTIC_HOME:-$HOME/.ghostic}"
 BIN_DIR="$HOME/.local/bin"
 
 print_banner() {
-  cat << 'BANNER'
+  cat << BANNER
 \033[35m
    .---.
   /     \
  | () () |     \033[1mGhostic CLI Installer\033[0m\033[35m
   \  _  /      \033[2mAutonomous AI Engineering Harness\033[0m\033[35m
    || ||
-   '' ''
+
 \033[0m
 BANNER
 }
@@ -62,9 +62,9 @@ check_node() {
     exit 1
   fi
 
-  NODE_VERSION=$(node -v | sed 's/^v//')
-  MAJOR_VERSION=$(echo "$NODE_VERSION" | cut -d'.' -f1)
-  MINOR_VERSION=$(echo "$NODE_VERSION" | cut -d'.' -f2)
+  NODE_VERSION=$(node -v | sed "s/^v//")
+  MAJOR_VERSION=$(echo "$NODE_VERSION" | cut -d"." -f1)
+  MINOR_VERSION=$(echo "$NODE_VERSION" | cut -d"." -f2)
 
   if [ "$MAJOR_VERSION" -lt 22 ] || ([ "$MAJOR_VERSION" -eq 22 ] && [ "$MINOR_VERSION" -lt 19 ]); then
     log_warn "Node.js hiện tại là v$NODE_VERSION. Khuyến nghị Node.js >= 22.19 hoặc >= 24 để hỗ trợ tối ưu."
@@ -93,37 +93,49 @@ check_pnpm() {
 }
 
 install_ghostic() {
-  if [ -d "$INSTALL_DIR" ]; then
-    log_info "Thư mục $INSTALL_DIR đã tồn tại. Đang cập nhật phiên bản mới nhất..."
+  if [ -d "$INSTALL_DIR/.git" ]; then
+    log_info "Cập nhật Ghostic tại $INSTALL_DIR..."
     cd "$INSTALL_DIR"
-    git fetch origin "$BRANCH"
-    git checkout "$BRANCH"
-    git pull origin "$BRANCH"
+    git fetch origin "$BRANCH" --depth 1
+    git reset --hard "origin/$BRANCH"
   else
-    log_info "Đang tải Ghostic về thư mục: $INSTALL_DIR..."
-    git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+    log_info "Tải siêu tốc Ghostic về: $INSTALL_DIR..."
+    rm -rf "$INSTALL_DIR"
+    git clone --depth 1 --single-branch --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
     cd "$INSTALL_DIR"
   fi
 
-  log_info "Đang cài đặt các module phụ thuộc..."
-  pnpm install --no-frozen-lockfile
+  log_info "Cài đặt các gói phụ thuộc (Fast install)..."
+  pnpm install --prefer-offline
 
-  log_info "Đang biên dịch và đóng gói Ghostic Engine..."
-  pnpm run build
+  log_info "Đóng gói Ghostic Engine..."
+  pnpm run build || true
 
-  # Create bin directory
+  # Create bin directories
   mkdir -p "$INSTALL_DIR/bin"
   mkdir -p "$BIN_DIR"
 
-  # Create wrapper executable
+  # Create robust wrapper script that always resolves to exact installation directory
   cat > "$INSTALL_DIR/bin/ghostic" << 'WRAPPER'
 #!/usr/bin/env bash
-GHOSTIC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec node "$GHOSTIC_ROOT/apps/cli/lib/bin.js" "$@"
+# Determine root directory by following symlinks
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+GHOSTIC_ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
+
+if [ -f "$GHOSTIC_ROOT/apps/cli/lib/bin.js" ]; then
+  exec node "$GHOSTIC_ROOT/apps/cli/lib/bin.js" "$@"
+else
+  exec node --import tsx/esm "$GHOSTIC_ROOT/apps/cli/src/bin.ts" "$@"
+fi
 WRAPPER
   chmod +x "$INSTALL_DIR/bin/ghostic"
 
-  # Symlink to ~/.local/bin/ghostic
+  # Copy / link wrapper to ~/.local/bin/ghostic
   ln -sf "$INSTALL_DIR/bin/ghostic" "$BIN_DIR/ghostic"
 
   # Also try symlink to /usr/local/bin if writable
@@ -179,11 +191,11 @@ main() {
   echo -e "${BOLD}${GREEN}🎉 Chúc mừng! Ghostic CLI đã được cài đặt thành công!${RESET}"
   echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   echo ""
-  echo -e "Để bắt đầu sử dụng, hãy mở một terminal mới hoặc chạy:"
+  echo -e "Để bắt đầu sử dụng ngay lập tức:"
   echo -e "  ${BOLD}${CYAN}export PATH=\"\$HOME/.local/bin:\$PATH\"${RESET}"
-  echo -e "  ${BOLD}${PURPLE}ghostic${RESET}              # Mở giao diện chat tương tác (REPL)"
-  echo -e "  ${BOLD}${PURPLE}ghostic \"nhiệm vụ\"${RESET}  # Chạy 1 tác vụ tự động"
-  echo -e "  ${BOLD}${PURPLE}ghostic web${RESET}          # Mở giao diện Web UI"
+  echo -e "  ${BOLD}${PURPLE}ghostic${RESET}              # Khởi động REPL chat tương tác"
+  echo -e "  ${BOLD}${PURPLE}ghostic \"nhiệm vụ\"${RESET}  # Chạy 1 tác vụ tự động (Headless)"
+  echo -e "  ${BOLD}${PURPLE}ghostic web${RESET}          # Khởi động giao diện Web UI"
   echo ""
 }
 

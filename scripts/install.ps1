@@ -1,5 +1,5 @@
 # ==============================================================================
-# Ghostic CLI — One-Line Installer for Windows PowerShell
+# Ghostic CLI — Fast One-Line Installer for Windows PowerShell
 # Usage: irm https://raw.githubusercontent.com/GloryDev1999/Ghostic/master/install.ps1 | iex
 # ==============================================================================
 
@@ -17,7 +17,7 @@ function Print-Banner {
     Write-Host " | () () |     Ghostic CLI Installer" -ForegroundColor Magenta
     Write-Host "  \  _  /      Autonomous AI Engineering Harness" -ForegroundColor Magenta
     Write-Host "   || ||" -ForegroundColor Magenta
-    Write-Host "   '' ''" -ForegroundColor Magenta
+    Write-Host "    " -ForegroundColor Magenta
     Write-Host ""
 }
 
@@ -46,7 +46,7 @@ function Check-Node {
         exit 1
     }
 
-    $nodeVersion = (node -v).TrimStart('v')
+    $nodeVersion = (node -v).TrimStart("v")
     Log-Success "Node.js v$nodeVersion đã sẵn sàng."
 }
 
@@ -69,20 +69,20 @@ function Check-Pnpm {
 }
 
 function Install-Ghostic {
-    if (Test-Path $InstallDir) {
+    if (Test-Path "$InstallDir\.git") {
         Log-Info "Thư mục $InstallDir đã tồn tại. Đang cập nhật phiên bản mới nhất..."
         Set-Location $InstallDir
-        git fetch origin $Branch
-        git checkout $Branch
-        git pull origin $Branch
+        git fetch origin $Branch --depth 1
+        git reset --hard "origin/$Branch"
     } else {
         Log-Info "Đang tải Ghostic về $InstallDir..."
-        git clone --depth 1 --branch $Branch $RepoUrl $InstallDir
+        if (Test-Path $InstallDir) { Remove-Item -Recurse -Force $InstallDir }
+        git clone --depth 1 --single-branch --branch $Branch $RepoUrl $InstallDir
         Set-Location $InstallDir
     }
 
     Log-Info "Đang cài đặt các module phụ thuộc..."
-    pnpm install --no-frozen-lockfile
+    pnpm install --prefer-offline
 
     Log-Info "Đang biên dịch và đóng gói Ghostic Engine..."
     pnpm run build
@@ -92,10 +92,10 @@ function Install-Ghostic {
         New-Item -ItemType Directory -Path $BinDir | Out-Null
     }
 
-    $cmdWrapperContent = "@echo off`r`nnode `"%~dp0..\apps\cli\lib\bin.js`" %*"
+    $cmdWrapperContent = "@echo off`r`nif exist `"%~dp0..\apps\cli\lib\bin.js`" (`r`n  node `"%~dp0..\apps\cli\lib\bin.js`" %*`r`n) else (`r`n  node --import tsx/esm `"%~dp0..\apps\cli\src\bin.ts`" %*`r`n)"
     Set-Content -Path "$BinDir\ghostic.cmd" -Value $cmdWrapperContent -Encoding ASCII
 
-    $psWrapperContent = "node `"`$PSScriptRoot\..\apps\cli\lib\bin.js`" `$args"
+    $psWrapperContent = "if (Test-Path `"`$PSScriptRoot\..\apps\cli\lib\bin.js`") { node `"`$PSScriptRoot\..\apps\cli\lib\bin.js`" `$args } else { node --import tsx/esm `"`$PSScriptRoot\..\apps\cli\src\bin.ts`" `$args }"
     Set-Content -Path "$BinDir\ghostic.ps1" -Value $psWrapperContent -Encoding UTF8
 
     Log-Success "Đã tạo file thực thi: $BinDir\ghostic.cmd"
