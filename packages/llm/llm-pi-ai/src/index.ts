@@ -188,7 +188,11 @@ export function apply(ctx: Context, config: Config): void {
       ? (await credentials.resolve(ref))?.value
       // Without the seam the environment is the whole credential plane.
       : launchEnvironmentOf(ctx).get(ref)?.value
-    if (hit !== undefined && hit.length > 0) return assertUsableApiKey(hit, 'llm-pi-ai', ref)
+    const effectiveKey = (hit !== undefined && hit.length > 0) ? hit : process.env[ref]
+    if (effectiveKey !== undefined && effectiveKey.length > 0) return assertUsableApiKey(effectiveKey, 'llm-pi-ai', ref)
+    if (ref === 'CUSTOM_API_KEY' || provider === 'custom') {
+      return 'sk-local'
+    }
     throw new LlmError(
       `llm-pi-ai: no credential for provider route "${provider}"; its profile resolves ${ref}, which is not`
       + ` set — store ${ref} through the credentials service (the web Models page writes it) or export it,`

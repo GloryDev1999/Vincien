@@ -157,7 +157,8 @@ async function ensureApiConfig(rl: ReturnType<typeof createInterface>, force = f
   const model = modelPrompt.trim() || defaultModel
 
   // Save to environment
-  process.env[keyEnvName] = apiKey || 'dummy-key'
+  const finalApiKey = apiKey || (provider === 'custom' ? 'sk-local' : 'dummy-key')
+  process.env[keyEnvName] = finalApiKey
   process.env.LLM_PROVIDER = provider
   process.env.LLM_MODEL = model
   if (baseUrl) {
@@ -166,7 +167,7 @@ async function ensureApiConfig(rl: ReturnType<typeof createInterface>, force = f
 
   // Safe update to .env
   const updates: Record<string, string> = {
-    [keyEnvName]: apiKey || 'dummy-key',
+    [keyEnvName]: finalApiKey,
     LLM_PROVIDER: provider,
     LLM_MODEL: model,
   }
